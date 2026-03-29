@@ -1,424 +1,449 @@
 <!DOCTYPE html>
 <html lang="ka">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GziroReader - Modern PDF Reader</title>
-  
-  <!-- PDF.js Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <style>
-    :root {
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --bg-dark: #0f172a;
-      --bg-sidebar: #1e293b;
-      --bg-canvas: #f1f5f9;
-      --text-main: #1e293b;
-      --text-muted: #64748b;
-      --white: #ffffff;
-      --player-bg: rgba(255, 255, 255, 0.95);
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GziroReader - Modern PDF Reader</title>
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', -apple-system, sans-serif;
-    }
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-    body {
-      display: flex;
-      height: 100vh;
-      background-color: var(--bg-canvas);
-      color: var(--text-main);
-      overflow: hidden;
-    }
-
-    /* --- Sidebar --- */
-    .sidebar {
-      width: 320px;
-      background-color: var(--bg-sidebar);
-      color: var(--white);
-      display: flex;
-      flex-direction: column;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 100;
-      box-shadow: 4px 0 15px rgba(0,0,0,0.1);
-    }
-
-    .brand {
-      padding: 30px 20px;
-      font-size: 1.5rem;
-      font-weight: 800;
-      background: linear-gradient(to right, #60a5fa, #3b82f6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .menu {
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .menu-btn {
-      background: rgba(255,255,255,0.05);
-      color: #cbd5e1;
-      border: 1px solid rgba(255,255,255,0.1);
-      padding: 16px;
-      border-radius: 12px;
-      cursor: pointer;
-      text-align: left;
-      font-size: 0.95rem;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .menu-btn i { width: 18px; height: 18px; }
-
-    .menu-btn:hover {
-      background: rgba(255,255,255,0.1);
-      color: white;
-      transform: translateY(-1px);
-    }
-
-    .menu-btn.active {
-      background: var(--primary);
-      color: white;
-      border-color: var(--primary);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-
-    /* --- Main Content --- */
-    .main-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
-
-    .mobile-nav {
-      display: none;
-      background: var(--bg-sidebar);
-      padding: 15px 20px;
-      justify-content: space-between;
-      align-items: center;
-      color: white;
-    }
-
-    /* --- Custom Player UI --- */
-    .custom-player {
-      background: var(--player-bg);
-      backdrop-filter: blur(10px);
-      padding: 20px 40px;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 25px;
-      z-index: 50;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .play-trigger {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--primary);
-      color: white;
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.2s;
-      flex-shrink: 0;
-    }
-
-    .play-trigger:hover { transform: scale(1.05); background: var(--primary-hover); }
-    .play-trigger:active { transform: scale(0.95); }
-
-    .timeline-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .time-info {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .progress-wrapper {
-      position: relative;
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    .progress-bar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 100%;
-      background: var(--primary);
-      border-radius: 3px;
-      width: 0%;
-    }
-
-    /* --- PDF Display --- */
-    .pdf-viewer {
-      flex: 1;
-      overflow-y: auto;
-      padding: 40px 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      scroll-behavior: smooth;
-    }
-
-    canvas {
-      max-width: 100%;
-      height: auto !important;
-      margin-bottom: 30px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      border-radius: 8px;
-      background: white;
-    }
-
-    .welcome-screen {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      color: var(--text-muted);
-    }
-
-    .welcome-screen i {
-      width: 64px;
-      height: 64px;
-      margin-bottom: 20px;
-      opacity: 0.2;
-    }
-
-    /* --- Responsive --- */
-    @media (max-width: 768px) {
-      .sidebar {
-        position: fixed;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        transform: translateX(-100%);
+    <style>
+      :root {
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --bg-dark: #0f172a;
+        --bg-sidebar: #1e293b;
+        --bg-canvas: #f1f5f9;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --white: #ffffff;
+        --player-bg: rgba(255, 255, 255, 0.95);
       }
-      .sidebar.open { transform: translateX(0); }
-      .mobile-nav { display: flex; }
-      .custom-player { padding: 15px; gap: 15px; }
-      .play-trigger { width: 40px; height: 40px; }
-    }
-  </style>
-</head>
-<body>
 
-  <!-- Hidden Native Audio -->
-  <audio id="audio-engine"></audio>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", -apple-system, sans-serif;
+      }
 
-  <aside class="sidebar" id="sidebar">
-    <div class="brand">GziroReader</div>
-    <div class="menu" id="menu-list">
-      <!-- Generated items -->
-    </div>
-  </aside>
+      body {
+        display: flex;
+        height: 100vh;
+        background-color: var(--bg-canvas);
+        color: var(--text-main);
+        overflow: hidden;
+      }
 
-  <main class="main-content">
-    <header class="mobile-nav">
-      <span style="font-weight: 700;">GziroReader</span>
-      <button onclick="toggleSidebar()" style="background:none; border:none; color:white; cursor:pointer;">
-        <i data-lucide="menu"></i>
-      </button>
-    </header>
+      /* --- Sidebar --- */
+      .sidebar {
+        width: 320px;
+        background-color: var(--bg-sidebar);
+        color: var(--white);
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+      }
 
-    <!-- Custom Control Bar -->
-    <div class="custom-player" id="player-ui" style="display:none;">
-      <button class="play-trigger" id="play-btn" onclick="togglePlay()">
-        <i data-lucide="play" id="play-icon"></i>
-      </button>
-      
-      <div class="timeline-container">
-        <div class="progress-wrapper" id="seek-bar">
-          <div class="progress-bar" id="progress-fill"></div>
-        </div>
-        <div class="time-info">
-          <span id="current-time">00:00</span>
-          <span id="duration-time">00:00</span>
-        </div>
-      </div>
-    </div>
+      .brand {
+        padding: 30px 20px;
+        font-size: 1.5rem;
+        font-weight: 800;
+        background: linear-gradient(to right, #60a5fa, #3b82f6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
 
-    <div class="pdf-viewer" id="viewer-container">
-      <div class="welcome-screen">
-        <i data-lucide="book-open"></i>
-        <h2>კეთილი იყოს თქვენი მობრძანება</h2>
-        <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
-      </div>
-    </div>
-  </main>
+      .menu {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
 
-  <script>
-    const files = [
-      { id: 1, title: "შესავალი", pdf: "pdf/reader1.pdf", audio: "audio/reader1.mp3" },
-      { id: 2, title: "სიცოცხლის წარმოშობა", pdf: "pdf/reader2.pdf", audio: "audio/reader2.mp3" }
-    ];
+      .menu-btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: #cbd5e1;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 16px;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: left;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
 
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      .menu-btn i {
+        width: 18px;
+        height: 18px;
+      }
 
-    const audio = document.getElementById('audio-engine');
-    const playBtn = document.getElementById('play-btn');
-    const playIcon = document.getElementById('play-icon');
-    const progressFill = document.getElementById('progress-fill');
-    const seekBar = document.getElementById('seek-bar');
-    const viewer = document.getElementById('viewer-container');
-    const playerUI = document.getElementById('player-ui');
+      .menu-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        transform: translateY(-1px);
+      }
 
-    let autoScrollEnabled = true;
+      .menu-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      }
 
-    // Init Lucide
-    lucide.createIcons();
+      /* --- Main Content --- */
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
 
-    // Setup Menu
-    const menuList = document.getElementById('menu-list');
-    files.forEach(file => {
-      const btn = document.createElement('button');
-      btn.className = 'menu-btn';
-      btn.innerHTML = `<i data-lucide="file-text"></i> ${file.title}`;
-      btn.onclick = () => loadFile(file, btn);
-      menuList.appendChild(btn);
-    });
-    lucide.createIcons();
+      .mobile-nav {
+        display: none;
+        background: #3b82f6;
+        padding: 15px 20px;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+      }
 
-    function toggleSidebar() {
-      document.getElementById('sidebar').classList.toggle('open');
-    }
+      /* --- Custom Player UI --- */
+      .custom-player {
+        background: var(--player-bg);
+        backdrop-filter: blur(10px);
+        padding: 20px 40px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        z-index: 50;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
 
-    async function loadFile(file, btn) {
-      // Toggle UI
-      document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if(window.innerWidth < 768) toggleSidebar();
-      
-      playerUI.style.display = 'flex';
-      viewer.innerHTML = '<p style="margin-top:20vh; color:#64748b;">იტვირთება დოკუმენტი...</p>';
-      
-      // Load Audio
-      audio.src = file.audio;
-      audio.load();
-      resetPlayerUI();
+      .play-trigger {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s;
+        flex-shrink: 0;
+      }
 
-      // Load PDF
-      try {
-        const loadingTask = pdfjsLib.getDocument(file.pdf);
-        const pdf = await loadingTask.promise;
-        viewer.innerHTML = '';
+      .play-trigger:hover {
+        transform: scale(1.05);
+        background: var(--primary-hover);
+      }
+      .play-trigger:active {
+        transform: scale(0.95);
+      }
 
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          
-          // Responsive scaling
-          const wrapperWidth = viewer.clientWidth - 40;
-          const scale = wrapperWidth / viewport.width;
-          const responsiveViewport = page.getViewport({ scale: Math.min(scale, 1.5) });
+      .timeline-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
 
-          canvas.height = responsiveViewport.height;
-          canvas.width = responsiveViewport.width;
-          await page.render({ canvasContext: context, viewport: responsiveViewport }).promise;
-          viewer.appendChild(canvas);
+      .time-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .progress-wrapper {
+        position: relative;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .progress-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: var(--primary);
+        border-radius: 3px;
+        width: 0%;
+      }
+
+      /* --- PDF Display --- */
+      .pdf-viewer {
+        flex: 1;
+        overflow-y: auto;
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        scroll-behavior: smooth;
+      }
+
+      canvas {
+        max-width: 100%;
+        height: auto !important;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        background: white;
+      }
+
+      .welcome-screen {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: var(--text-muted);
+      }
+
+      .welcome-screen i {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 20px;
+        opacity: 0.2;
+      }
+
+      /* --- Responsive --- */
+      @media (max-width: 768px) {
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          transform: translateX(-100%);
         }
-      } catch (err) {
-        viewer.innerHTML = `<div style="padding:40px; text-align:center;">
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .mobile-nav {
+          display: flex;
+        }
+        .custom-player {
+          padding: 15px;
+          gap: 15px;
+        }
+        .play-trigger {
+          width: 40px;
+          height: 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hidden Native Audio -->
+    <audio id="audio-engine"></audio>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">GziroReader</div>
+      <div class="menu" id="menu-list">
+        <!-- Generated items -->
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="mobile-nav">
+        <span style="font-weight: 700">GziroReader</span>
+        <button onclick="toggleSidebar()" style="background: none; border: none; color: white; cursor: pointer">
+          <i data-lucide="menu"></i>
+        </button>
+      </header>
+
+      <!-- Custom Control Bar -->
+      <div class="custom-player" id="player-ui" style="display: none">
+        <button class="play-trigger" id="play-btn" onclick="togglePlay()">
+          <i data-lucide="play" id="play-icon"></i>
+        </button>
+
+        <div class="timeline-container">
+          <div class="progress-wrapper" id="seek-bar">
+            <div class="progress-bar" id="progress-fill"></div>
+          </div>
+          <div class="time-info">
+            <span id="current-time">00:00</span>
+            <span id="duration-time">00:00</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pdf-viewer" id="viewer-container">
+        <div class="welcome-screen">
+          <i data-lucide="book-open"></i>
+          <h2>კეთილი იყოს თქვენი მობრძანება</h2>
+          <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const files = [
+        { id: 1, title: "შესავალი", pdf: "pdf/reader1.pdf", audio: "audio/reader1.mp3" },
+        { id: 2, title: "სიცოცხლის წარმოშობა", pdf: "pdf/reader2.pdf", audio: "audio/reader2.mp3" },
+      ];
+
+      const pdfjsLib = window["pdfjs-dist/build/pdf"];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+      const audio = document.getElementById("audio-engine");
+      const playBtn = document.getElementById("play-btn");
+      const playIcon = document.getElementById("play-icon");
+      const progressFill = document.getElementById("progress-fill");
+      const seekBar = document.getElementById("seek-bar");
+      const viewer = document.getElementById("viewer-container");
+      const playerUI = document.getElementById("player-ui");
+
+      let autoScrollEnabled = true;
+
+      // Init Lucide
+      lucide.createIcons();
+
+      // Setup Menu
+      const menuList = document.getElementById("menu-list");
+      files.forEach((file) => {
+        const btn = document.createElement("button");
+        btn.className = "menu-btn";
+        btn.innerHTML = `<i data-lucide="file-text"></i> ${file.title}`;
+        btn.onclick = () => loadFile(file, btn);
+        menuList.appendChild(btn);
+      });
+      lucide.createIcons();
+
+      function toggleSidebar() {
+        document.getElementById("sidebar").classList.toggle("open");
+      }
+
+      async function loadFile(file, btn) {
+        // Toggle UI
+        document.querySelectorAll(".menu-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (window.innerWidth < 768) toggleSidebar();
+
+        playerUI.style.display = "flex";
+        viewer.innerHTML = '<p style="margin-top:20vh; color:#64748b;">იტვირთება დოკუმენტი...</p>';
+
+        // Stop and reset audio before switching
+        audio.pause();
+        audio.currentTime = 0;
+
+        // Load Audio
+        audio.src = file.audio;
+        audio.load();
+        resetPlayerUI();
+
+        // Load PDF
+        try {
+          const loadingTask = pdfjsLib.getDocument(file.pdf);
+          const pdf = await loadingTask.promise;
+          viewer.innerHTML = "";
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+
+            // Responsive scaling
+            const wrapperWidth = viewer.clientWidth - 40;
+            const scale = wrapperWidth / viewport.width;
+            const responsiveViewport = page.getViewport({ scale: Math.min(scale, 1.5) });
+
+            canvas.height = responsiveViewport.height;
+            canvas.width = responsiveViewport.width;
+            await page.render({ canvasContext: context, viewport: responsiveViewport }).promise;
+            viewer.appendChild(canvas);
+          }
+        } catch (err) {
+          viewer.innerHTML = `<div style="padding:40px; text-align:center;">
           <h3 style="color:#ef4444;">ფაილი ვერ მოიძებნა</h3>
           <p>დარწმუნდით, რომ ფაილები სწორ საქაღალდეშია განთავსებული.</p>
         </div>`;
-      }
-    }
-
-    // --- Player Logic ---
-    function togglePlay() {
-      if (audio.paused) audio.play();
-      else audio.pause();
-    }
-
-    audio.onplay = () => {
-      playBtn.innerHTML = '<i data-lucide="pause"></i>';
-      lucide.createIcons();
-    };
-
-    audio.onpause = () => {
-      playBtn.innerHTML = '<i data-lucide="play"></i>';
-      lucide.createIcons();
-    };
-
-    audio.ontimeupdate = () => {
-      const percent = (audio.currentTime / audio.duration) * 100;
-      progressFill.style.width = percent + '%';
-      
-      document.getElementById('current-time').innerText = formatTime(audio.currentTime);
-      if(!isNaN(audio.duration)) {
-        document.getElementById('duration-time').innerText = formatTime(audio.duration);
+        }
       }
 
-      // Sync Scroll
-      if (autoScrollEnabled && !audio.paused) {
-        const scrollMax = viewer.scrollHeight - viewer.clientHeight;
-        viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
+      // --- Player Logic ---
+      function togglePlay() {
+        if (audio.paused) audio.play();
+        else audio.pause();
       }
-    };
 
-    // Seek functionality
-    seekBar.onclick = (e) => {
-      const rect = seekBar.getBoundingClientRect();
-      const pos = (e.clientX - rect.left) / rect.width;
-      audio.currentTime = pos * audio.duration;
-    };
+      audio.onplay = () => {
+        updatePlayIcon(true);
+      };
 
-    function formatTime(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = Math.floor(seconds % 60);
-      return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-    }
+      audio.onpause = () => {
+        updatePlayIcon(false);
+      };
 
-    function resetPlayerUI() {
-      progressFill.style.width = '0%';
-      document.getElementById('current-time').innerText = '00:00';
-    }
+      function updatePlayIcon(isPlaying) {
+        playBtn.innerHTML = isPlaying ? '<i data-lucide="pause"></i>' : '<i data-lucide="play"></i>';
+        lucide.createIcons();
+      }
 
-    // Stop auto-scroll on user interaction
-    viewer.addEventListener('mousedown', () => autoScrollEnabled = false);
-    viewer.addEventListener('mouseup', () => {
-        setTimeout(() => autoScrollEnabled = true, 3000);
-    });
-    viewer.addEventListener('wheel', () => {
+      audio.ontimeupdate = () => {
+        const percent = (audio.currentTime / audio.duration) * 100;
+        progressFill.style.width = percent + "%";
+
+        document.getElementById("current-time").innerText = formatTime(audio.currentTime);
+        if (!isNaN(audio.duration)) {
+          document.getElementById("duration-time").innerText = formatTime(audio.duration);
+        }
+
+        // Sync Scroll
+        if (autoScrollEnabled && !audio.paused) {
+          const scrollMax = viewer.scrollHeight - viewer.clientHeight;
+          viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
+        }
+      };
+
+      // Seek functionality
+      seekBar.onclick = (e) => {
+        const rect = seekBar.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = pos * audio.duration;
+      };
+
+      function formatTime(seconds) {
+        const min = Math.floor(seconds / 60);
+        const sec = Math.floor(seconds % 60);
+        return `${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+      }
+
+      function resetPlayerUI() {
+        progressFill.style.width = "0%";
+        document.getElementById("current-time").innerText = "00:00";
+        updatePlayIcon(false); // Force icon back to Play state
+      }
+
+      // Stop auto-scroll on user interaction
+      viewer.addEventListener("mousedown", () => (autoScrollEnabled = false));
+      viewer.addEventListener("mouseup", () => {
+        setTimeout(() => (autoScrollEnabled = true), 3000);
+      });
+      viewer.addEventListener("wheel", () => {
         autoScrollEnabled = false;
         clearTimeout(window.scrollTimeout);
-        window.scrollTimeout = setTimeout(() => autoScrollEnabled = true, 3000);
-    });
-  </script>
-</body>
+        window.scrollTimeout = setTimeout(() => (autoScrollEnabled = true), 3000);
+      });
+    </script>
+  </body>
 </html>
