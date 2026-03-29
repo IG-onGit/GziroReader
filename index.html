@@ -203,14 +203,15 @@
       /* --- PDF Display Container --- */
       .pdf-viewer {
         flex: 1;
-        overflow: hidden; /* We handle scrolling/panning manually via JS for grab effect */
+        overflow: auto; /* Allow scrolling if zoomed */
         background: #cbd5e1;
         position: relative;
         cursor: grab;
+        /* Centering using Flexbox instead of Absolute transform */
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        touch-action: none; /* Block native scroll to use our Grab logic */
+        touch-action: none;
       }
 
       .pdf-viewer:active {
@@ -218,15 +219,12 @@
       }
 
       #pdf-render-area {
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%); /* Base positioning */
         transform-origin: top center;
         display: flex;
         flex-direction: column;
         align-items: center;
         padding: 40px 20px;
+        min-width: 100%; /* Ensure it occupies full width for centering */
       }
 
       canvas {
@@ -400,8 +398,8 @@
         autoScrollEnabled = false;
         clearTimeout(scrollTimeout);
 
-        const pageX = e.pageX || e.touches[0].pageX;
-        const pageY = e.pageY || e.touches[0].pageY;
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+        const pageY = e.pageY || (e.touches ? e.touches[0].pageY : 0);
 
         startX = pageX - viewer.offsetLeft;
         startY = pageY - viewer.offsetTop;
@@ -414,7 +412,7 @@
         // Resume auto-scroll after 2 seconds of inactivity
         scrollTimeout = setTimeout(() => {
           autoScrollEnabled = true;
-          lastAudioTime = audio.currentTime; // Sync point for resuming relative scroll
+          lastAudioTime = audio.currentTime;
         }, 2000);
       };
 
@@ -444,26 +442,24 @@
 
       // --- Zoom Logic ---
       function changeZoom(delta) {
-        // Removed the 2.5 upper limit, kept lower limit to prevent disappearing
         currentZoom = Math.max(currentZoom + delta, 0.2);
         applyZoom();
       }
 
       function resetZoom() {
-        currentZoom = 0.8; // Default fit
+        currentZoom = 0.8;
         if (window.innerWidth > 1200) currentZoom = 1.0;
         applyZoom();
       }
 
       function applyZoom() {
-        renderArea.style.transform = `translateX(-50%) scale(${currentZoom})`;
-        viewer.style.overflow = "auto";
+        renderArea.style.transform = `scale(${currentZoom})`;
       }
 
       // --- Player Logic ---
       function togglePlay() {
         if (audio.paused) {
-          lastAudioTime = audio.currentTime; // Mark start time for relative scrolling
+          lastAudioTime = audio.currentTime;
           audio.play();
         } else {
           audio.pause();
@@ -487,12 +483,10 @@
         document.getElementById("current-time").innerText = formatTime(audio.currentTime);
         document.getElementById("duration-time").innerText = formatTime(duration);
 
-        // --- Relative Auto-scroll Sync ---
         if (autoScrollEnabled && !audio.paused && !isDragging) {
           const timeDelta = audio.currentTime - lastAudioTime;
           if (timeDelta > 0) {
             const scrollMax = viewer.scrollHeight - viewer.clientHeight;
-            // Calculate movement based on time passed relative to total duration
             const moveAmount = (timeDelta / duration) * scrollMax;
             viewer.scrollTop += moveAmount;
           }
@@ -504,7 +498,7 @@
         const rect = seekBar.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
         audio.currentTime = pos * audio.duration;
-        lastAudioTime = audio.currentTime; // Sync for scroll
+        lastAudioTime = audio.currentTime;
       };
 
       function formatTime(seconds) {
