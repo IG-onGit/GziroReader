@@ -338,6 +338,7 @@
       let scrollLeft, scrollTop;
       let autoScrollEnabled = true;
       let scrollTimeout;
+      let lastAudioTime = 0;
 
       // Init Lucide
       lucide.createIcons();
@@ -367,6 +368,7 @@
 
         audio.pause();
         audio.currentTime = 0;
+        lastAudioTime = 0;
         audio.src = file.audio;
         audio.load();
         resetPlayerUI();
@@ -409,8 +411,11 @@
 
       const stopDragging = () => {
         isDragging = false;
-        // Resume auto-scroll after 3 seconds of inactivity
-        scrollTimeout = setTimeout(() => (autoScrollEnabled = true), 3000);
+        // Resume auto-scroll after 2 seconds of inactivity
+        scrollTimeout = setTimeout(() => {
+          autoScrollEnabled = true;
+          lastAudioTime = audio.currentTime; // Sync point for resuming relative scroll
+        }, 2000);
       };
 
       const moveDragging = (e) => {
@@ -439,7 +444,8 @@
 
       // --- Zoom Logic ---
       function changeZoom(delta) {
-        currentZoom = Math.min(Math.max(currentZoom + delta, 0.4), 2.5);
+        // Removed the 2.5 upper limit, kept lower limit to prevent disappearing
+        currentZoom = Math.max(currentZoom + delta, 0.2);
         applyZoom();
       }
 
@@ -451,14 +457,17 @@
 
       function applyZoom() {
         renderArea.style.transform = `translateX(-50%) scale(${currentZoom})`;
-        // Ensure viewer is scrollable if content exceeds bounds
         viewer.style.overflow = "auto";
       }
 
       // --- Player Logic ---
       function togglePlay() {
-        if (audio.paused) audio.play();
-        else audio.pause();
+        if (audio.paused) {
+          lastAudioTime = audio.currentTime; // Mark start time for relative scrolling
+          audio.play();
+        } else {
+          audio.pause();
+        }
       }
 
       audio.onplay = () => updatePlayIcon(true);
@@ -470,24 +479,32 @@
       }
 
       audio.ontimeupdate = () => {
-        const percent = (audio.currentTime / audio.duration) * 100;
+        const duration = audio.duration;
+        if (isNaN(duration)) return;
+
+        const percent = (audio.currentTime / duration) * 100;
         progressFill.style.width = percent + "%";
         document.getElementById("current-time").innerText = formatTime(audio.currentTime);
-        if (!isNaN(audio.duration)) document.getElementById("duration-time").innerText = formatTime(audio.duration);
+        document.getElementById("duration-time").innerText = formatTime(duration);
 
-        // Auto-scroll sync
+        // --- Relative Auto-scroll Sync ---
         if (autoScrollEnabled && !audio.paused && !isDragging) {
-          const scrollMax = viewer.scrollHeight - viewer.clientHeight;
-          if (scrollMax > 0) {
-            viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
+          const timeDelta = audio.currentTime - lastAudioTime;
+          if (timeDelta > 0) {
+            const scrollMax = viewer.scrollHeight - viewer.clientHeight;
+            // Calculate movement based on time passed relative to total duration
+            const moveAmount = (timeDelta / duration) * scrollMax;
+            viewer.scrollTop += moveAmount;
           }
         }
+        lastAudioTime = audio.currentTime;
       };
 
       seekBar.onclick = (e) => {
         const rect = seekBar.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
         audio.currentTime = pos * audio.duration;
+        lastAudioTime = audio.currentTime; // Sync for scroll
       };
 
       function formatTime(seconds) {
