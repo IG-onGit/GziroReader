@@ -30,14 +30,15 @@
         font-family: "Inter", -apple-system, sans-serif;
       }
 
+      /* Prevent the entire website/browser from zooming or bouncing */
       html,
       body {
-        /* Prevent the entire website from zooming/scrolling */
-        touch-action: none;
         position: fixed;
         width: 100%;
         height: 100%;
         overflow: hidden;
+        touch-action: none;
+        -webkit-text-size-adjust: 100%;
       }
 
       body {
@@ -73,6 +74,7 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+        overflow-y: auto;
       }
 
       .menu-btn {
@@ -89,18 +91,6 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        touch-action: manipulation;
-      }
-
-      .menu-btn i {
-        width: 18px;
-        height: 18px;
-      }
-
-      .menu-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: white;
-        transform: translateY(-1px);
       }
 
       .menu-btn.active {
@@ -120,31 +110,28 @@
 
       .mobile-nav {
         display: none;
-        background: var(--bg-sidebar);
+        background: #3b82f6;
         padding: 15px 20px;
         justify-content: space-between;
         align-items: center;
         color: white;
-        touch-action: manipulation;
       }
 
       /* --- Custom Player UI --- */
       .custom-player {
         background: var(--player-bg);
         backdrop-filter: blur(10px);
-        padding: 20px 40px;
+        padding: 15px 30px;
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
-        gap: 25px;
+        gap: 20px;
         z-index: 50;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        touch-action: manipulation;
       }
 
       .play-trigger {
-        width: 48px;
-        height: 48px;
+        width: 44px;
+        height: 44px;
         border-radius: 50%;
         background: var(--primary);
         color: white;
@@ -153,28 +140,14 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        transition: transform 0.2s;
         flex-shrink: 0;
-      }
-
-      .play-trigger:hover {
-        transform: scale(1.05);
-        background: var(--primary-hover);
       }
 
       .timeline-container {
         flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 8px;
-      }
-
-      .time-info {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        font-weight: 600;
+        gap: 5px;
       }
 
       .progress-wrapper {
@@ -193,6 +166,13 @@
         background: var(--primary);
         border-radius: 3px;
         width: 0%;
+      }
+
+      .time-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: var(--text-muted);
       }
 
       /* --- Zoom Controls --- */
@@ -217,47 +197,49 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        transition: all 0.2s;
-        touch-action: manipulation;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
 
-      /* --- PDF Display --- */
+      /* --- PDF Display Container --- */
       .pdf-viewer {
         flex: 1;
-        overflow: auto;
-        padding: 40px 20px;
+        overflow: hidden; /* We handle scrolling/panning manually via JS for grab effect */
+        background: #cbd5e1;
+        position: relative;
+        cursor: grab;
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        scroll-behavior: smooth;
-        /* Enable scrolling and pinch gestures specifically for this area */
-        touch-action: pan-x pan-y pinch-zoom;
+        justify-content: center;
+        align-items: flex-start;
+        touch-action: none; /* Block native scroll to use our Grab logic */
+      }
+
+      .pdf-viewer:active {
+        cursor: grabbing;
       }
 
       #pdf-render-area {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%); /* Base positioning */
+        transform-origin: top center;
         display: flex;
         flex-direction: column;
         align-items: center;
-        transform-origin: top center;
-        transition: transform 0.1s ease-out;
+        padding: 40px 20px;
       }
 
       canvas {
         max-width: 100%;
         height: auto !important;
         margin-bottom: 30px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
         background: white;
       }
 
       .welcome-screen {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        margin-top: 20vh;
         text-align: center;
         color: var(--text-muted);
       }
@@ -277,29 +259,19 @@
         .mobile-nav {
           display: flex;
         }
-        .custom-player {
-          padding: 15px;
-          gap: 15px;
-        }
-        .play-trigger {
-          width: 40px;
-          height: 40px;
-        }
         .zoom-controls {
-          display: none !important;
-        } /* Hide buttons on mobile, use pinch */
+          bottom: 20px;
+          right: 20px;
+        }
       }
     </style>
   </head>
   <body>
-    <!-- Hidden Native Audio -->
     <audio id="audio-engine"></audio>
 
     <aside class="sidebar" id="sidebar">
       <div class="brand">GziroReader</div>
-      <div class="menu" id="menu-list">
-        <!-- Generated items -->
-      </div>
+      <div class="menu" id="menu-list"></div>
     </aside>
 
     <main class="main-content">
@@ -310,12 +282,10 @@
         </button>
       </header>
 
-      <!-- Custom Control Bar -->
       <div class="custom-player" id="player-ui" style="display: none">
         <button class="play-trigger" id="play-btn" onclick="togglePlay()">
           <i data-lucide="play" id="play-icon"></i>
         </button>
-
         <div class="timeline-container">
           <div class="progress-wrapper" id="seek-bar">
             <div class="progress-bar" id="progress-fill"></div>
@@ -327,19 +297,18 @@
         </div>
       </div>
 
-      <!-- Zoom UI (Desktop Only) -->
       <div class="zoom-controls" id="zoom-ui" style="display: none">
-        <button class="zoom-btn" onclick="changeZoom(0.1)" title="Zoom In"><i data-lucide="zoom-in"></i></button>
-        <button class="zoom-btn" onclick="changeZoom(-0.1)" title="Zoom Out"><i data-lucide="zoom-out"></i></button>
-        <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom"><i data-lucide="maximize"></i></button>
+        <button class="zoom-btn" onclick="changeZoom(0.15)"><i data-lucide="zoom-in"></i></button>
+        <button class="zoom-btn" onclick="changeZoom(-0.15)"><i data-lucide="zoom-out"></i></button>
+        <button class="zoom-btn" onclick="resetZoom()"><i data-lucide="maximize"></i></button>
       </div>
 
       <div class="pdf-viewer" id="viewer-container">
         <div id="pdf-render-area">
           <div class="welcome-screen">
             <i data-lucide="book-open" style="width: 64px; height: 64px; opacity: 0.2; margin-bottom: 20px"></i>
-            <h2>კეთილი იყოს თქვენი მობრძანება</h2>
-            <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
+            <h2>მოგესალმებით</h2>
+            <p>აირჩიეთ ფაილი დასაწყებად</p>
           </div>
         </div>
       </div>
@@ -363,10 +332,12 @@
       const playerUI = document.getElementById("player-ui");
       const zoomUI = document.getElementById("zoom-ui");
 
-      let autoScrollEnabled = true;
       let currentZoom = 1.0;
-      let initialPinchDist = -1;
-      let initialZoom = 1.0;
+      let isDragging = false;
+      let startX, startY;
+      let scrollLeft, scrollTop;
+      let autoScrollEnabled = true;
+      let scrollTimeout;
 
       // Init Lucide
       lucide.createIcons();
@@ -380,7 +351,6 @@
         btn.onclick = () => loadFile(file, btn);
         menuList.appendChild(btn);
       });
-      lucide.createIcons();
 
       function toggleSidebar() {
         document.getElementById("sidebar").classList.toggle("open");
@@ -389,7 +359,7 @@
       async function loadFile(file, btn) {
         document.querySelectorAll(".menu-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-        if (window.innerWidth < 768) sidebar.classList.remove("open");
+        if (window.innerWidth < 768) document.getElementById("sidebar").classList.remove("open");
 
         playerUI.style.display = "flex";
         zoomUI.style.display = "flex";
@@ -418,54 +388,72 @@
             renderArea.appendChild(canvas);
           }
         } catch (err) {
-          renderArea.innerHTML = `<div style="padding:40px; text-align:center;"><h3 style="color:#ef4444;">ფაილი ვერ მოიძებნა</h3></div>`;
+          renderArea.innerHTML = `<div style="padding:40px; text-align:center;">შეცდომა ფაილის ჩატვირთვისას</div>`;
         }
       }
 
+      // --- Grab and Pan Logic ---
+      const startDragging = (e) => {
+        isDragging = true;
+        autoScrollEnabled = false;
+        clearTimeout(scrollTimeout);
+
+        const pageX = e.pageX || e.touches[0].pageX;
+        const pageY = e.pageY || e.touches[0].pageY;
+
+        startX = pageX - viewer.offsetLeft;
+        startY = pageY - viewer.offsetTop;
+        scrollLeft = viewer.scrollLeft;
+        scrollTop = viewer.scrollTop;
+      };
+
+      const stopDragging = () => {
+        isDragging = false;
+        // Resume auto-scroll after 3 seconds of inactivity
+        scrollTimeout = setTimeout(() => (autoScrollEnabled = true), 3000);
+      };
+
+      const moveDragging = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : null);
+        const pageY = e.pageY || (e.touches ? e.touches[0].pageY : null);
+        if (pageX === null) return;
+
+        const x = pageX - viewer.offsetLeft;
+        const y = pageY - viewer.offsetTop;
+        const walkX = x - startX;
+        const walkY = y - startY;
+
+        viewer.scrollLeft = scrollLeft - walkX;
+        viewer.scrollTop = scrollTop - walkY;
+      };
+
+      viewer.addEventListener("mousedown", startDragging);
+      viewer.addEventListener("touchstart", startDragging, { passive: false });
+      window.addEventListener("mouseup", stopDragging);
+      window.addEventListener("touchend", stopDragging);
+      window.addEventListener("mousemove", moveDragging);
+      window.addEventListener("touchmove", moveDragging, { passive: false });
+
       // --- Zoom Logic ---
       function changeZoom(delta) {
-        currentZoom = Math.min(Math.max(currentZoom + delta, 0.5), 3.0);
+        currentZoom = Math.min(Math.max(currentZoom + delta, 0.4), 2.5);
         applyZoom();
       }
 
       function resetZoom() {
-        currentZoom = 1.0;
+        currentZoom = 0.8; // Default fit
+        if (window.innerWidth > 1200) currentZoom = 1.0;
         applyZoom();
       }
 
       function applyZoom() {
-        renderArea.style.transform = `scale(${currentZoom})`;
-        renderArea.style.width = currentZoom > 1 ? "max-content" : "100%";
+        renderArea.style.transform = `translateX(-50%) scale(${currentZoom})`;
+        // Ensure viewer is scrollable if content exceeds bounds
+        viewer.style.overflow = "auto";
       }
-
-      // --- Touch Pinch Zoom (Mobile Only) ---
-      viewer.addEventListener(
-        "touchstart",
-        (e) => {
-          if (e.touches.length === 2) {
-            initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            initialZoom = currentZoom;
-          }
-        },
-        { passive: true }
-      );
-
-      viewer.addEventListener(
-        "touchmove",
-        (e) => {
-          if (e.touches.length === 2 && initialPinchDist > 0) {
-            const currentDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            const zoomFactor = currentDist / initialPinchDist;
-            currentZoom = Math.min(Math.max(initialZoom * zoomFactor, 0.8), 3.0);
-            applyZoom();
-          }
-        },
-        { passive: true }
-      );
-
-      viewer.addEventListener("touchend", () => {
-        initialPinchDist = -1;
-      });
 
       // --- Player Logic ---
       function togglePlay() {
@@ -487,9 +475,12 @@
         document.getElementById("current-time").innerText = formatTime(audio.currentTime);
         if (!isNaN(audio.duration)) document.getElementById("duration-time").innerText = formatTime(audio.duration);
 
-        if (autoScrollEnabled && !audio.paused) {
-          const scrollMax = renderArea.scrollHeight * currentZoom - viewer.clientHeight;
-          viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
+        // Auto-scroll sync
+        if (autoScrollEnabled && !audio.paused && !isDragging) {
+          const scrollMax = viewer.scrollHeight - viewer.clientHeight;
+          if (scrollMax > 0) {
+            viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
+          }
         }
       };
 
@@ -510,22 +501,6 @@
         document.getElementById("current-time").innerText = "00:00";
         updatePlayIcon(false);
       }
-
-      // Stop auto-scroll on user interaction
-      viewer.addEventListener("mousedown", () => (autoScrollEnabled = false));
-      viewer.addEventListener("touchstart", () => (autoScrollEnabled = false), { passive: true });
-
-      const resumeAutoScroll = () => {
-        clearTimeout(window.scrollTimeout);
-        window.scrollTimeout = setTimeout(() => (autoScrollEnabled = true), 3000);
-      };
-
-      viewer.addEventListener("mouseup", resumeAutoScroll);
-      viewer.addEventListener("touchend", resumeAutoScroll);
-      viewer.addEventListener("wheel", () => {
-        autoScrollEnabled = false;
-        resumeAutoScroll();
-      });
     </script>
   </body>
 </html>
