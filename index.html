@@ -28,18 +28,22 @@
         margin: 0;
         padding: 0;
         font-family: "Inter", -apple-system, sans-serif;
-        /* Disable default touch actions to prevent accidental browser zoom/gestures */
-        touch-action: manipulation;
+      }
+
+      html,
+      body {
+        /* Prevent the entire website from zooming/scrolling */
+        touch-action: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
       }
 
       body {
         display: flex;
-        height: 100vh;
         background-color: var(--bg-canvas);
         color: var(--text-main);
-        overflow: hidden;
-        position: fixed; /* Prevent rubber-banding on iOS */
-        width: 100%;
       }
 
       /* --- Sidebar --- */
@@ -85,6 +89,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        touch-action: manipulation;
       }
 
       .menu-btn i {
@@ -120,6 +125,7 @@
         justify-content: space-between;
         align-items: center;
         color: white;
+        touch-action: manipulation;
       }
 
       /* --- Custom Player UI --- */
@@ -133,6 +139,7 @@
         gap: 25px;
         z-index: 50;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        touch-action: manipulation;
       }
 
       .play-trigger {
@@ -153,9 +160,6 @@
       .play-trigger:hover {
         transform: scale(1.05);
         background: var(--primary-hover);
-      }
-      .play-trigger:active {
-        transform: scale(0.95);
       }
 
       .timeline-container {
@@ -215,23 +219,20 @@
         cursor: pointer;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         transition: all 0.2s;
-      }
-
-      .zoom-btn:hover {
-        background: #f8fafc;
-        color: var(--primary);
+        touch-action: manipulation;
       }
 
       /* --- PDF Display --- */
       .pdf-viewer {
         flex: 1;
-        overflow-y: auto;
-        overflow-x: auto;
+        overflow: auto;
         padding: 40px 20px;
         display: flex;
         flex-direction: column;
         align-items: center;
         scroll-behavior: smooth;
+        /* Enable scrolling and pinch gestures specifically for this area */
+        touch-action: pan-x pan-y pinch-zoom;
       }
 
       #pdf-render-area {
@@ -239,7 +240,7 @@
         flex-direction: column;
         align-items: center;
         transform-origin: top center;
-        transition: transform 0.2s ease-out;
+        transition: transform 0.1s ease-out;
       }
 
       canvas {
@@ -259,13 +260,6 @@
         align-items: center;
         text-align: center;
         color: var(--text-muted);
-      }
-
-      .welcome-screen i {
-        width: 64px;
-        height: 64px;
-        margin-bottom: 20px;
-        opacity: 0.2;
       }
 
       /* --- Responsive --- */
@@ -292,9 +286,8 @@
           height: 40px;
         }
         .zoom-controls {
-          bottom: 20px;
-          right: 20px;
-        }
+          display: none !important;
+        } /* Hide buttons on mobile, use pinch */
       }
     </style>
   </head>
@@ -334,7 +327,7 @@
         </div>
       </div>
 
-      <!-- Zoom UI -->
+      <!-- Zoom UI (Desktop Only) -->
       <div class="zoom-controls" id="zoom-ui" style="display: none">
         <button class="zoom-btn" onclick="changeZoom(0.1)" title="Zoom In"><i data-lucide="zoom-in"></i></button>
         <button class="zoom-btn" onclick="changeZoom(-0.1)" title="Zoom Out"><i data-lucide="zoom-out"></i></button>
@@ -344,7 +337,7 @@
       <div class="pdf-viewer" id="viewer-container">
         <div id="pdf-render-area">
           <div class="welcome-screen">
-            <i data-lucide="book-open"></i>
+            <i data-lucide="book-open" style="width: 64px; height: 64px; opacity: 0.2; margin-bottom: 20px"></i>
             <h2>კეთილი იყოს თქვენი მობრძანება</h2>
             <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
           </div>
@@ -363,7 +356,6 @@
 
       const audio = document.getElementById("audio-engine");
       const playBtn = document.getElementById("play-btn");
-      const playIcon = document.getElementById("play-icon");
       const progressFill = document.getElementById("progress-fill");
       const seekBar = document.getElementById("seek-bar");
       const viewer = document.getElementById("viewer-container");
@@ -373,7 +365,8 @@
 
       let autoScrollEnabled = true;
       let currentZoom = 1.0;
-      let currentFile = null;
+      let initialPinchDist = -1;
+      let initialZoom = 1.0;
 
       // Init Lucide
       lucide.createIcons();
@@ -394,27 +387,21 @@
       }
 
       async function loadFile(file, btn) {
-        currentFile = file;
-        // Toggle UI
         document.querySelectorAll(".menu-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-        if (window.innerWidth < 768) toggleSidebar();
+        if (window.innerWidth < 768) sidebar.classList.remove("open");
 
         playerUI.style.display = "flex";
         zoomUI.style.display = "flex";
         renderArea.innerHTML = '<p style="margin-top:20vh; color:#64748b;">იტვირთება დოკუმენტი...</p>';
 
-        // Stop and reset audio before switching
         audio.pause();
         audio.currentTime = 0;
-
-        // Load Audio
         audio.src = file.audio;
         audio.load();
         resetPlayerUI();
         resetZoom();
 
-        // Load PDF
         try {
           const loadingTask = pdfjsLib.getDocument(file.pdf);
           const pdf = await loadingTask.promise;
@@ -422,20 +409,16 @@
 
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 }); // Render at high res for zoom
+            const viewport = page.getViewport({ scale: 2.0 });
             const canvas = document.createElement("canvas");
             const context = canvas.getContext("2d");
-
             canvas.height = viewport.height;
             canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport: viewport }).promise;
             renderArea.appendChild(canvas);
           }
         } catch (err) {
-          renderArea.innerHTML = `<div style="padding:40px; text-align:center;">
-          <h3 style="color:#ef4444;">ფაილი ვერ მოიძებნა</h3>
-          <p>დარწმუნდით, რომ ფაილები სწორ საქაღალდეშია განთავსებული.</p>
-        </div>`;
+          renderArea.innerHTML = `<div style="padding:40px; text-align:center;"><h3 style="color:#ef4444;">ფაილი ვერ მოიძებნა</h3></div>`;
         }
       }
 
@@ -452,9 +435,37 @@
 
       function applyZoom() {
         renderArea.style.transform = `scale(${currentZoom})`;
-        // If we are zoomed out, center the content, otherwise align top
         renderArea.style.width = currentZoom > 1 ? "max-content" : "100%";
       }
+
+      // --- Touch Pinch Zoom (Mobile Only) ---
+      viewer.addEventListener(
+        "touchstart",
+        (e) => {
+          if (e.touches.length === 2) {
+            initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            initialZoom = currentZoom;
+          }
+        },
+        { passive: true }
+      );
+
+      viewer.addEventListener(
+        "touchmove",
+        (e) => {
+          if (e.touches.length === 2 && initialPinchDist > 0) {
+            const currentDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            const zoomFactor = currentDist / initialPinchDist;
+            currentZoom = Math.min(Math.max(initialZoom * zoomFactor, 0.8), 3.0);
+            applyZoom();
+          }
+        },
+        { passive: true }
+      );
+
+      viewer.addEventListener("touchend", () => {
+        initialPinchDist = -1;
+      });
 
       // --- Player Logic ---
       function togglePlay() {
@@ -462,13 +473,8 @@
         else audio.pause();
       }
 
-      audio.onplay = () => {
-        updatePlayIcon(true);
-      };
-
-      audio.onpause = () => {
-        updatePlayIcon(false);
-      };
+      audio.onplay = () => updatePlayIcon(true);
+      audio.onpause = () => updatePlayIcon(false);
 
       function updatePlayIcon(isPlaying) {
         playBtn.innerHTML = isPlaying ? '<i data-lucide="pause"></i>' : '<i data-lucide="play"></i>';
@@ -478,21 +484,15 @@
       audio.ontimeupdate = () => {
         const percent = (audio.currentTime / audio.duration) * 100;
         progressFill.style.width = percent + "%";
-
         document.getElementById("current-time").innerText = formatTime(audio.currentTime);
-        if (!isNaN(audio.duration)) {
-          document.getElementById("duration-time").innerText = formatTime(audio.duration);
-        }
+        if (!isNaN(audio.duration)) document.getElementById("duration-time").innerText = formatTime(audio.duration);
 
-        // Sync Scroll
         if (autoScrollEnabled && !audio.paused) {
-          // Calculate scroll based on the scaled height
           const scrollMax = renderArea.scrollHeight * currentZoom - viewer.clientHeight;
           viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
         }
       };
 
-      // Seek functionality
       seekBar.onclick = (e) => {
         const rect = seekBar.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
@@ -513,13 +513,18 @@
 
       // Stop auto-scroll on user interaction
       viewer.addEventListener("mousedown", () => (autoScrollEnabled = false));
-      viewer.addEventListener("mouseup", () => {
-        setTimeout(() => (autoScrollEnabled = true), 3000);
-      });
-      viewer.addEventListener("wheel", () => {
-        autoScrollEnabled = false;
+      viewer.addEventListener("touchstart", () => (autoScrollEnabled = false), { passive: true });
+
+      const resumeAutoScroll = () => {
         clearTimeout(window.scrollTimeout);
         window.scrollTimeout = setTimeout(() => (autoScrollEnabled = true), 3000);
+      };
+
+      viewer.addEventListener("mouseup", resumeAutoScroll);
+      viewer.addEventListener("touchend", resumeAutoScroll);
+      viewer.addEventListener("wheel", () => {
+        autoScrollEnabled = false;
+        resumeAutoScroll();
       });
     </script>
   </body>
