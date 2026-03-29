@@ -2,7 +2,7 @@
 <html lang="ka">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>GziroReader - Modern PDF Reader</title>
 
     <!-- PDF.js Library -->
@@ -28,6 +28,8 @@
         margin: 0;
         padding: 0;
         font-family: "Inter", -apple-system, sans-serif;
+        /* Disable default touch actions to prevent accidental browser zoom/gestures */
+        touch-action: manipulation;
       }
 
       body {
@@ -36,6 +38,8 @@
         background-color: var(--bg-canvas);
         color: var(--text-main);
         overflow: hidden;
+        position: fixed; /* Prevent rubber-banding on iOS */
+        width: 100%;
       }
 
       /* --- Sidebar --- */
@@ -111,7 +115,7 @@
 
       .mobile-nav {
         display: none;
-        background: #3b82f6;
+        background: var(--bg-sidebar);
         padding: 15px 20px;
         justify-content: space-between;
         align-items: center;
@@ -187,15 +191,55 @@
         width: 0%;
       }
 
+      /* --- Zoom Controls --- */
+      .zoom-controls {
+        position: absolute;
+        bottom: 30px;
+        right: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 60;
+      }
+
+      .zoom-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--white);
+        border: 1px solid #e2e8f0;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s;
+      }
+
+      .zoom-btn:hover {
+        background: #f8fafc;
+        color: var(--primary);
+      }
+
       /* --- PDF Display --- */
       .pdf-viewer {
         flex: 1;
         overflow-y: auto;
+        overflow-x: auto;
         padding: 40px 20px;
         display: flex;
         flex-direction: column;
         align-items: center;
         scroll-behavior: smooth;
+      }
+
+      #pdf-render-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transform-origin: top center;
+        transition: transform 0.2s ease-out;
       }
 
       canvas {
@@ -247,6 +291,10 @@
           width: 40px;
           height: 40px;
         }
+        .zoom-controls {
+          bottom: 20px;
+          right: 20px;
+        }
       }
     </style>
   </head>
@@ -286,11 +334,20 @@
         </div>
       </div>
 
+      <!-- Zoom UI -->
+      <div class="zoom-controls" id="zoom-ui" style="display: none">
+        <button class="zoom-btn" onclick="changeZoom(0.1)" title="Zoom In"><i data-lucide="zoom-in"></i></button>
+        <button class="zoom-btn" onclick="changeZoom(-0.1)" title="Zoom Out"><i data-lucide="zoom-out"></i></button>
+        <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom"><i data-lucide="maximize"></i></button>
+      </div>
+
       <div class="pdf-viewer" id="viewer-container">
-        <div class="welcome-screen">
-          <i data-lucide="book-open"></i>
-          <h2>კეთილი იყოს თქვენი მობრძანება</h2>
-          <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
+        <div id="pdf-render-area">
+          <div class="welcome-screen">
+            <i data-lucide="book-open"></i>
+            <h2>კეთილი იყოს თქვენი მობრძანება</h2>
+            <p>აირჩიეთ ფაილი მარცხენა მენიუდან დასაწყებად</p>
+          </div>
         </div>
       </div>
     </main>
@@ -310,9 +367,13 @@
       const progressFill = document.getElementById("progress-fill");
       const seekBar = document.getElementById("seek-bar");
       const viewer = document.getElementById("viewer-container");
+      const renderArea = document.getElementById("pdf-render-area");
       const playerUI = document.getElementById("player-ui");
+      const zoomUI = document.getElementById("zoom-ui");
 
       let autoScrollEnabled = true;
+      let currentZoom = 1.0;
+      let currentFile = null;
 
       // Init Lucide
       lucide.createIcons();
@@ -333,13 +394,15 @@
       }
 
       async function loadFile(file, btn) {
+        currentFile = file;
         // Toggle UI
         document.querySelectorAll(".menu-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         if (window.innerWidth < 768) toggleSidebar();
 
         playerUI.style.display = "flex";
-        viewer.innerHTML = '<p style="margin-top:20vh; color:#64748b;">იტვირთება დოკუმენტი...</p>';
+        zoomUI.style.display = "flex";
+        renderArea.innerHTML = '<p style="margin-top:20vh; color:#64748b;">იტვირთება დოკუმენტი...</p>';
 
         // Stop and reset audio before switching
         audio.pause();
@@ -349,35 +412,48 @@
         audio.src = file.audio;
         audio.load();
         resetPlayerUI();
+        resetZoom();
 
         // Load PDF
         try {
           const loadingTask = pdfjsLib.getDocument(file.pdf);
           const pdf = await loadingTask.promise;
-          viewer.innerHTML = "";
+          renderArea.innerHTML = "";
 
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const viewport = page.getViewport({ scale: 2.0 }); // Render at high res for zoom
             const canvas = document.createElement("canvas");
             const context = canvas.getContext("2d");
 
-            // Responsive scaling
-            const wrapperWidth = viewer.clientWidth - 40;
-            const scale = wrapperWidth / viewport.width;
-            const responsiveViewport = page.getViewport({ scale: Math.min(scale, 1.5) });
-
-            canvas.height = responsiveViewport.height;
-            canvas.width = responsiveViewport.width;
-            await page.render({ canvasContext: context, viewport: responsiveViewport }).promise;
-            viewer.appendChild(canvas);
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            renderArea.appendChild(canvas);
           }
         } catch (err) {
-          viewer.innerHTML = `<div style="padding:40px; text-align:center;">
+          renderArea.innerHTML = `<div style="padding:40px; text-align:center;">
           <h3 style="color:#ef4444;">ფაილი ვერ მოიძებნა</h3>
           <p>დარწმუნდით, რომ ფაილები სწორ საქაღალდეშია განთავსებული.</p>
         </div>`;
         }
+      }
+
+      // --- Zoom Logic ---
+      function changeZoom(delta) {
+        currentZoom = Math.min(Math.max(currentZoom + delta, 0.5), 3.0);
+        applyZoom();
+      }
+
+      function resetZoom() {
+        currentZoom = 1.0;
+        applyZoom();
+      }
+
+      function applyZoom() {
+        renderArea.style.transform = `scale(${currentZoom})`;
+        // If we are zoomed out, center the content, otherwise align top
+        renderArea.style.width = currentZoom > 1 ? "max-content" : "100%";
       }
 
       // --- Player Logic ---
@@ -410,7 +486,8 @@
 
         // Sync Scroll
         if (autoScrollEnabled && !audio.paused) {
-          const scrollMax = viewer.scrollHeight - viewer.clientHeight;
+          // Calculate scroll based on the scaled height
+          const scrollMax = renderArea.scrollHeight * currentZoom - viewer.clientHeight;
           viewer.scrollTop = (audio.currentTime / audio.duration) * scrollMax;
         }
       };
@@ -431,7 +508,7 @@
       function resetPlayerUI() {
         progressFill.style.width = "0%";
         document.getElementById("current-time").innerText = "00:00";
-        updatePlayIcon(false); // Force icon back to Play state
+        updatePlayIcon(false);
       }
 
       // Stop auto-scroll on user interaction
