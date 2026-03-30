@@ -203,13 +203,13 @@
       /* --- PDF Display Container --- */
       .pdf-viewer {
         flex: 1;
-        overflow: auto; /* Allow scrolling if zoomed */
+        overflow: auto;
         background: #cbd5e1;
         position: relative;
         cursor: grab;
-        /* Centering using Flexbox instead of Absolute transform */
         display: flex;
-        justify-content: center;
+        /* Using flex-start + margin auto on child to fix left-side clipping on zoom */
+        justify-content: flex-start;
         align-items: flex-start;
         touch-action: none;
       }
@@ -219,12 +219,13 @@
       }
 
       #pdf-render-area {
-        transform-origin: top center;
+        transform-origin: top left;
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 40px 20px;
-        min-width: 100%; /* Ensure it occupies full width for centering */
+        padding: 40px;
+        /* Margin auto ensures centering when small, flex-start handles zoom overflow */
+        margin: 0 auto;
       }
 
       canvas {
@@ -240,6 +241,7 @@
         margin-top: 20vh;
         text-align: center;
         color: var(--text-muted);
+        width: 100%;
       }
 
       /* --- Responsive --- */
@@ -370,24 +372,42 @@
         audio.src = file.audio;
         audio.load();
         resetPlayerUI();
-        resetZoom();
 
         try {
           const loadingTask = pdfjsLib.getDocument(file.pdf);
           const pdf = await loadingTask.promise;
           renderArea.innerHTML = "";
 
+          // Determine fitting scale for the first page
+          const firstPage = await pdf.getPage(1);
+          const unscaledViewport = firstPage.getViewport({ scale: 1.0 });
+
+          // Calculate scale to fit width (leaving some padding for aesthetics)
+          const containerWidth = viewer.clientWidth - 80; // Subtracting the 40px padding on each side
+          const fitScale = containerWidth / unscaledViewport.width;
+
+          // Reset zoom to 1.0, but apply the fitScale as the rendering baseline
+          currentZoom = 1.0;
+
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 });
+            // Render at high resolution (fitScale * 2) but display at fitScale via transform
+            const viewport = page.getViewport({ scale: fitScale * 2.0 });
             const canvas = document.createElement("canvas");
             const context = canvas.getContext("2d");
             canvas.height = viewport.height;
             canvas.width = viewport.width;
+
+            // Use CSS to control the display size relative to the renderArea's scale(1)
+            canvas.style.width = viewport.width / 2 + "px";
+
             await page.render({ canvasContext: context, viewport: viewport }).promise;
             renderArea.appendChild(canvas);
           }
+
+          applyZoom(); // Apply initial 1.0 scale
         } catch (err) {
+          console.error(err);
           renderArea.innerHTML = `<div style="padding:40px; text-align:center;">შეცდომა ფაილის ჩატვირთვისას</div>`;
         }
       }
@@ -442,13 +462,12 @@
 
       // --- Zoom Logic ---
       function changeZoom(delta) {
-        currentZoom = Math.max(currentZoom + delta, 0.2);
+        currentZoom = Math.max(currentZoom + delta, 0.1);
         applyZoom();
       }
 
       function resetZoom() {
-        currentZoom = 0.8;
-        if (window.innerWidth > 1200) currentZoom = 1.0;
+        currentZoom = 1.0;
         applyZoom();
       }
 
