@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GziroReader - Modern PDF Reader</title>
+    <title>MyReader - Modern PDF Reader</title>
 
     <!-- PDF.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -270,13 +270,13 @@
     <audio id="audio-engine"></audio>
 
     <aside class="sidebar" id="sidebar">
-      <div class="brand">GziroReader</div>
+      <div class="brand">MyReader</div>
       <div class="menu" id="menu-list"></div>
     </aside>
 
     <main class="main-content">
       <header class="mobile-nav">
-        <span style="font-weight: 700">GziroReader</span>
+        <span style="font-weight: 700">MyReader</span>
         <button onclick="toggleSidebar()" style="background: none; border: none; color: white; cursor: pointer">
           <i data-lucide="menu"></i>
         </button>
@@ -316,8 +316,14 @@
 
     <script>
       const files = [
-        { id: 1, title: "შესავალი", pdf: "pdf/reader1.pdf", audio: "audio/reader1.mp3" },
-        { id: 2, title: "სიცოცხლის წარმოშობა", pdf: "pdf/reader2.pdf", audio: "audio/reader2.mp3" },
+        { title: "შესავალი", pdf: "reader1" },
+        { title: "სიცოცხლის წარმოშობა", pdf: "reader2" },
+        { title: "გენეტიკა. ეპიგენეტიკა", pdf: "reader3" },
+        { title: "უჯრედული სისტემები", pdf: "reader4" },
+        { title: "გენური ინჟინერია", pdf: "reader5" },
+        { title: "დნმ-ის პროფილირება 1", pdf: "attachment1" },
+        { title: "დნმ-ის პროფილირება 2", pdf: "attachment2" },
+        //ADD//
       ];
 
       const pdfjsLib = window["pdfjs-dist/build/pdf"];
@@ -369,12 +375,12 @@
         audio.pause();
         audio.currentTime = 0;
         lastAudioTime = 0;
-        audio.src = file.audio;
+        audio.src = `pdf/${file.audio}.pdf`;
         audio.load();
         resetPlayerUI();
 
         try {
-          const loadingTask = pdfjsLib.getDocument(file.pdf);
+          const loadingTask = pdfjsLib.getDocument(`pdf/${file.pdf}.pdf`);
           const pdf = await loadingTask.promise;
           renderArea.innerHTML = "";
 
