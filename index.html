@@ -286,10 +286,22 @@
         <button class="play-trigger" id="play-btn" onclick="togglePlay()">
           <i data-lucide="play" id="play-icon"></i>
         </button>
+
+        <button class="zoom-btn" onclick="changePlaybackRate(-0.25)">
+          <i data-lucide="rewind"></i>
+        </button>
+
+        <div id="speed-label" style="min-width: 55px; text-align: center; font-weight: 600">1.00x</div>
+
+        <button class="zoom-btn" onclick="changePlaybackRate(0.25)">
+          <i data-lucide="fast-forward"></i>
+        </button>
+
         <div class="timeline-container">
           <div class="progress-wrapper" id="seek-bar">
             <div class="progress-bar" id="progress-fill"></div>
           </div>
+
           <div class="time-info">
             <span id="current-time">00:00</span>
             <span id="duration-time">00:00</span>
@@ -377,6 +389,8 @@
         lastAudioTime = 0;
         audio.src = `audio/${file.pdf}.mp3`;
         audio.load();
+        audio.playbackRate = 1;
+        document.getElementById("speed-label").innerText = "1.00x";
         resetPlayerUI();
 
         try {
@@ -489,6 +503,14 @@
         } else {
           audio.pause();
         }
+      }
+
+      function changePlaybackRate(delta) {
+        let newRate = audio.playbackRate + delta;
+        newRate = Math.max(0.5, Math.min(newRate, 3));
+        newRate = Math.round(newRate * 100) / 100;
+        audio.playbackRate = newRate;
+        document.getElementById("speed-label").innerText = `${newRate.toFixed(2)}x`;
       }
 
       audio.onplay = () => updatePlayIcon(true);
